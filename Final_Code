@@ -1,0 +1,196 @@
+Purpose: Autonomous sumo robot control with Sparkfun redboard for final sumo project check
+ This program functions as the code for our autonomous sumo robot for the second battle
+ This program utilizes two side sensors and their states as well as a back sensor to keep the robot inside of the circle
+ This program utilizes two front USD sensors in order to be able to compleltely sense and adjust to where the opposing robot is
+ When a robot is not in range the servo motors will spin in opposite directions, dependent on the phase, spinning/scanning the robot
+ When a robot is in range, dependent on distance, the servos will spin in a certain direction putting the robot into the ideal attack mode
+
+
+*********************************************************************************************/
+
+
+#include <Servo.h> //servo library
+
+
+Servo servo_R; //right servo
+Servo servo_L; //left servo
+
+
+const int leftSensor = 11 ;   //assign sensor pins for three down light sensors
+const int rightSensor = 10 ;
+const int backSensor = 9 ;
+
+
+const int trigPinright = 7 ; //assign pins for trig and echo pins for first usds
+const int echoPinright = 6 ;
+
+
+const int trigPinleft = 5 ; //assign pins for trig and echo pins for second usds
+const int echoPinleft = 4 ;
+
+
+int phase = 0; //initialize boolean varibale
+int lsensorState = 0; //initialize sensor variable left
+int rsensorState = 0; //initialize sensor varable right
+int bsensorState = 0; //initialize sensor variable back
+
+
+float distanceright = 0; //stores distance measured by usds for right
+float distanceleft = 0; //stores distance measured by usds for right
+
+
+int flag = 1;
+
+
+void setup() { //do setup once
+//-----------------------------------
+  pinMode(leftSensor, INPUT); //declare assigned sensor pins as input
+  pinMode(rightSensor, INPUT);
+  pinMode(backSensor, INPUT);
+
+
+  servo_R.attach(12); //servo attachment pins (...) for numbers of pints to be input)
+  servo_L.attach(13);
+
+
+  pinMode(trigPinright, OUTPUT);  //USDS pins trig outputs, echo recieves RIGHT SENSOR
+  pinMode(echoPinright, INPUT);
+
+
+  pinMode(trigPinleft, OUTPUT); //USDS pins trig outputs, echo recieves LEFT SENSOR
+  pinMode(echoPinleft, INPUT);
+}
+
+
+void loop() {
+//--------------------------------------------------------------------------------
+  rsensorState = digitalRead(rightSensor); //right sensor read
+  lsensorState = digitalRead(leftSensor); //left sensor read
+  bsensorState = digitalRead(backSensor); //back sensor read
+
+
+  distanceright = getDistanceright(trigPinright, echoPinright) * 1.0051; //get distance from right sensor and assign to right distance variable
+  distanceleft = getDistanceleft(trigPinleft, echoPinleft) * 1.0051; //get distance from left sensor and assign to left distance variable
+
+
+  Serial.print(distanceright); //print distance from right sensor
+  Serial.println("in"); //print units (in)
+
+
+  Serial.print(distanceleft); //print distance from left sensor
+  Serial.println("in"); //print units (in)
+
+
+//-------------------------Brain of Robot Portion-------------------------------//
+
+
+  if (rsensorState == LOW){ // if right front down sensor hits the white
+    if (phase != 0){ //if phase is not set to 0
+      phase = 0; //set phase to 0
+   
+    servo_R.write(0);
+    servo_L.write(0);
+    Serial.println("Right Sensor");
+    delay (250);
+    }
+  }
+
+
+  if (lsensorState == LOW){ //if left front down sensor hits the white
+    if (phase != 1){ //if phase is not set to 1
+      phase = 1; //set to 1
+   
+    servo_R.write(180); //spin robot accordingly to get back inbounds
+    servo_L.write(180);
+    Serial.println("Left Sensor");
+    delay(250);
+    }
+  }
+  if (lsensorState == LOW && rsensorState == LOW){
+    servo_R.write(180);
+    servo_L.write(0);
+    delay(250);
+  }
+  if (bsensorState == LOW){ //if back down sensor hits the white
+    servo_R.write(0);
+    servo_L.write(180);
+    Serial.println("Back Sensor");
+    delay(250);
+  }
+  if (distanceleft > 20 && distanceright > 20 && rsensorState == HIGH && lsensorState == HIGH && bsensorState == HIGH){ //if robot is out of distance and our robot is completly inbounds
+    if (phase == 0){
+      servo_R.write(0); //scan spinning left
+      servo_L.write(0);
+      delay(250);
+    }
+    if (phase == 1){
+      servo_R.write(180); //scan spinning right
+      servo_L.write(180);
+      delay(250);
+    }
+  }
+  if (distanceleft < 20 && distanceright < 20 && rsensorState == HIGH && lsensorState == HIGH && bsensorState == HIGH){ //if the robot is within 20 inches and our robot is completly inbounds
+    servo_R.write(0); //straight forward
+    servo_L.write(180);
+    delay(250);
+    }
+
+
+  if (distanceleft < 20 && distanceright > 20 && rsensorState == HIGH && lsensorState == HIGH && bsensorState == HIGH){ //if the robot is within 20 inches of the left sensor but not the right and our robot is completly inbounds
+    servo_R.write(180); //spin left
+    servo_L.write(180);
+    delay(250);
+  }
+
+
+  if(distanceleft > 20 && distanceright < 20 && rsensorState == HIGH && lsensorState == HIGH && bsensorState == HIGH) { //if robot is within 20 inches of the right sensor but the not the left and our robot is completly inbounds
+    servo_R.write(0); //spin right
+    servo_L.write(0);
+    delay(250);
+  }
+} //End of loop
+
+
+//-------------------Functions----------------------------//
+
+
+//RETURNS DISTANCE FROM RIGHT DISTANCE SENSOR
+float getDistanceright(int trigPinright, int echoPinright){
+  float echoTimeright;                   //variable to store the time it takes for a ping to bounce off an object
+  float calculatedDistanceright;         //variable to store the distance calculated from the echo time
+ 
+  //send out an ultrasonic pulse that's 10ms long
+  digitalWrite(trigPinright, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPinright, LOW);
+
+
+  echoTimeright = pulseIn(echoPinright, HIGH);      //use the pulsein command to see how long it takes for the
+                                          //pulse to bounce back to the sensor
+
+
+  calculatedDistanceright = echoTimeright / 148.0;  //calculate the distance of the object that reflected the pulse (half the bounce time multiplied by the speed of sound)
+ 
+  return calculatedDistanceright;              //send back the distance that was calculated
+}
+
+
+//RETURNS DISTANCE FROM LEFT DISTANCE SENSOR
+float getDistanceleft(int trigPinleft, int echoPinleft){
+  float echoTimeleft;                   //variable to store the time it takes for a ping to bounce off an object
+  float calculatedDistanceleft;         //variable to store the distance calculated from the echo time
+ 
+  //send out an ultrasonic pulse that's 10ms long
+  digitalWrite(trigPinleft, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPinleft, LOW);
+
+
+  echoTimeleft = pulseIn(echoPinleft, HIGH);      //use the pulsein command to see how long it takes for the
+                                          //pulse to bounce back to the sensor
+
+
+  calculatedDistanceleft = echoTimeleft / 148.0;  //calculate the distance of the object that reflected the pulse (half the bounce time multiplied by the speed of sound)
+ 
+  return calculatedDistanceleft;              //send back the distance that was calculated
+}
